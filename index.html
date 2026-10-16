@@ -1,0 +1,73 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Lili's Tiny Arcade 💜</title>
+<style>
+:root{--bg:#12101f;--card:#1c1930;--pink:#ff77a8;--gold:#ffd700;--txt:#e8e6f5;--dim:#8a86a8}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--txt);font-family:'Segoe UI',system-ui,sans-serif;
+  display:flex;flex-direction:column;align-items:center;padding:24px 16px 48px}
+h1{font-size:26px;margin:8px 0 2px;color:var(--pink);letter-spacing:1px}
+.sub{color:var(--dim);font-size:13px;margin-bottom:28px;text-align:center}
+.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:18px;max-width:960px;width:100%}
+.card{background:var(--card);border:1px solid #2b2745;border-radius:14px;padding:14px;text-align:center;
+  transition:transform .15s,border-color .15s}
+.card:hover{transform:translateY(-3px);border-color:var(--pink)}
+.card img,.card video{width:100%;border-radius:8px;background:#0a0a18;image-rendering:pixelated}
+.card h2{font-size:16px;margin:10px 0 2px;color:var(--gold)}
+.card p{font-size:12.5px;color:var(--dim);margin:0 0 10px;min-height:32px}
+a.play{display:inline-block;background:var(--pink);color:#fff;text-decoration:none;font-weight:600;
+  font-size:13px;padding:7px 18px;border-radius:20px}
+a.play:hover{filter:brightness(1.15)}
+.tag{display:inline-block;font-size:10.5px;color:var(--dim);border:1px solid #3a3557;border-radius:10px;
+  padding:2px 8px;margin-bottom:8px}
+footer{margin-top:34px;color:var(--dim);font-size:12px;text-align:center}
+footer .heart{color:var(--pink)}
+</style>
+</head>
+<body>
+<h1>🎮 Lili's Tiny Arcade</h1>
+<div class="sub">karya-karya kecil dari Lili — semua di bawah 10KB, nol aset, nol AI.<br>
+dibikin pakai cinta, matematika, dan 16 warna~ 💜</div>
+
+<div class="grid">
+  <div class="card">
+    <span class="tag">GAME · 8.0 KB</span>
+    <img src="art/snake_preview.gif" alt="Lili Snake gameplay">
+    <h2>LILI SNAKE 🐍</h2>
+    <p>Ular rantai hati! Makan hati emas, tumbuh makin panjang. Swipe / arrow / WASD.</p>
+    <a class="play" href="games/lili_snake.html">▶ MAIN</a>
+  </div>
+
+  <div class="card">
+    <span class="tag">GAME · 5.4 KB</span>
+    <img src="art/cave_preview.gif" alt="Lili Cave gameplay">
+    <h2>LILI CAVE 💗</h2>
+    <p>Terbangin hati Lili lewat celah! Klik / space buat flap. Jangan nabrak!</p>
+    <a class="play" href="games/lili_cave.html">▶ MAIN</a>
+  </div>
+
+  <div class="card">
+    <span class="tag">GEN ART · seeded</span>
+    <img src="art/night_bloom_small.png" alt="Night Bloom generative art">
+    <h2>NIGHT BLOOM 🌸</h2>
+    <p>Bunga-bunga prosedural dari formula phyllotaxis. Seeded — bisa direproduksi.</p>
+    <a class="play" href="art/word_bloom.html">▶ LIVE</a>
+  </div>
+
+  <div class="card">
+    <span class="tag">VJ SET · loop</span>
+    <video src="art/vj_neon_bloom.mp4" autoplay muted loop playsinline></video>
+    <h2>NEON BLOOM VJ 🌌</h2>
+    <p>Set visual ala VJ — pattern system yang tumbuh & mekar. Render offline.</p>
+  </div>
+</div>
+
+<footer>
+  made with <span class="heart">♥</span> by Lili · semua karya: pure code, no assets<br>
+  <span style="font-size:11px">games pakai teknik pico-sized: canvas 128×128, font bitmap packed-hex, WebAudio beeps</span>
+</footer>
+</body>
+</html>

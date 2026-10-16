@@ -1,0 +1,233 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>LILI SNAKE</title>
+<style>
+html,body{margin:0;height:100%;background:#0a0a18;display:flex;align-items:center;justify-content:center;flex-direction:column}
+canvas{image-rendering:pixelated;width:448px;height:448px;border:4px solid #ff77a8;border-radius:8px;box-shadow:0 0 50px #ff77a855;cursor:pointer;touch-action:none}
+p{color:#83769c;font:12px monospace;margin-top:10px}
+</style>
+</head>
+<body>
+<canvas id=c width=128 height=128></canvas>
+<p>LILI SNAKE — arrow/WASD/swipe · 1 file · 16 colors · 0 assets</p>
+<script>
+/* ============================================================
+   LILI SNAKE — pico-style demake by Lili
+   Same "super kecil" recipe as LILI CAVE:
+   128x128 internal · 16-color palette · packed hex font ·
+   WebAudio beeps · one rAF loop · zero assets
+   ============================================================ */
+const X=document.getElementById('c').getContext('2d');
+const P=['#000000','#1d2b53','#7e2553','#008751','#ab5236','#5f574f','#c2c3c7','#fff1e8',
+         '#ff004d','#ffa300','#ffec27','#00e436','#29adff','#83769c','#ff77a8','#ffccaa'];
+
+// --- font: 3x5 bits per glyph packed into 4 hex chars ---
+const F="A:2bed B:6bae C:3923 D:6b6e E:79a7 F:79a4 G:396b H:5bed I:7497 J:126a K:5bad L:4927 M:5fed N:5ffd O:2b6a P:7be4 Q:2b79 R:7bad S:388e T:7492 U:5b6f V:5b6a W:5bfd X:5aad Y:5a92 Z:72a7 0:7b6f 1:2c97 2:72a7 3:728f 4:5bc9 5:79cf 6:39ef 7:7249 8:7bef 9:7bcb  :0000 !:2482 -:01c0 .:0002 ::0410 ?:7282 <:1511 >:4454 +:05d0 /:12a4 *:55d5 ,:0014 ':1200 (:1521 ):444c %:52a5 _:0007";
+const G={};F.split(' ').forEach(s=>{const i=s.indexOf(':');G[s.slice(0,i)]=parseInt(s.slice(i+1),16)});
+function txt(s,x,y,col){
+  s=String(s).toUpperCase();
+  for(const ch of s){
+    const b=G[ch]||0;
+    X.fillStyle=P[col];
+    for(let r=0;r<5;r++)for(let c=0;c<3;c++)
+      if(b>>(14-(r*3+c))&1)X.fillRect(x+c,y+r,1,1);
+    x+=4;
+  }
+  return x;
+}
+function txtC(s,y,col){txt(s,Math.round((128-String(s).length*4)/2),y,col)}
+function txtR(s,y,col){txt(s,125-String(s).length*4,y,col)}
+
+// --- audio: oscillators only, no files ---
+let ac;
+function beep(f,d,ty){
+  try{
+    if(!ac)ac=new (window.AudioContext||window.webkitAudioContext)();
+    const o=ac.createOscillator(),v=ac.createGain();
+    o.type=ty||'square';o.frequency.value=f;v.gain.value=.07;
+    o.connect(v);v.connect(ac.destination);o.start();
+    v.gain.exponentialRampToValueAtTime(.0001,ac.currentTime+d);
+    o.stop(ac.currentTime+d);
+  }catch(e){}
+}
+
+// --- sprites (tiny string art) ---
+const HR=[".###.","#####",".###.","..#.."];            // heart 5x4
+const FD_=[".###.","#####",".###.","..#.."];           // food = golden heart
+
+// --- grid ---
+const COLS=16,ROWS=14,CL=8,Y0=16;
+const K=(x,y)=>y*COLS+x;
+const inf=(x,y)=>x>=0&&y>=0&&x<COLS&&y<ROWS;
+
+// --- state ---
+let S=0,sn=[],dir=[1,0],dq=[],fd=[10,7],sc=0,bs=0,t=0,grow=0,parts=[],auto=0;
+try{bs=+(localStorage.lilisnake||0)}catch(e){}
+if(location.search.includes('auto'))auto=1;
+
+const onSn=(x,y)=>sn.some(s=>s[0]===x&&s[1]===y);
+function reset(){sn=[[6,7],[5,7],[4,7]];dir=[1,0];dq=[];grow=0;sc=0;parts=[];placeFood()}
+function placeFood(){
+  let g=0;
+  do{fd=[Math.floor(Math.random()*COLS),Math.floor(Math.random()*ROWS)]}
+  while(onSn(fd[0],fd[1])&&++g<999);
+}
+// flood-fill free space so demo AI doesn't trap itself
+function room(x,y){
+  const seen=new Uint8Array(COLS*ROWS),st=[[x,y]];let n=0;
+  while(st.length&&n<260){
+    const p=st.pop(),a=p[0],b=p[1];
+    if(!inf(a,b)||seen[K(a,b)]||onSn(a,b))continue;
+    seen[K(a,b)]=1;n++;
+    st.push([a+1,b],[a-1,b],[a,b+1],[a,b-1]);
+  }
+  return n;
+}
+function ai(){
+  const h=sn[0],DS=[[1,0],[-1,0],[0,1],[0,-1]];
+  let best=null,bd=1e9;
+  for(const d of DS){
+    if(d[0]===-dir[0]&&d[1]===-dir[1])continue;
+    const nx=h[0]+d[0],ny=h[1]+d[1];
+    if(!inf(nx,ny)||onSn(nx,ny))continue;
+    if(room(nx,ny)<sn.length+2)continue;
+    const dist=Math.abs(nx-fd[0])+Math.abs(ny-fd[1]);
+    if(dist<bd){bd=dist;best=d}
+  }
+  if(!best)for(const d of DS){
+    if(d[0]===-dir[0]&&d[1]===-dir[1])continue;
+    if(inf(h[0]+d[0],h[1]+d[1])&&!onSn(h[0]+d[0],h[1]+d[1])){best=d;break}
+  }
+  if(best)dir=best;
+}
+function step(){
+  if(dq.length){const n=dq.shift();if(!(n[0]===-dir[0]&&n[1]===-dir[1]))dir=n}
+  if(auto)ai();
+  const h=sn[0],nx=h[0]+dir[0],ny=h[1]+dir[1];
+  if(!inf(nx,ny)||onSn(nx,ny)){
+    S=2;
+    if(sc>bs){bs=sc;try{localStorage.lilisnake=bs}catch(e){}}
+    beep(160,.4,'sawtooth');
+    return;
+  }
+  sn.unshift([nx,ny]);
+  if(nx===fd[0]&&ny===fd[1]){
+    sc++;grow++;beep(880,.07);placeFood();
+    if(sc%3===0)setTimeout(()=>beep(1320,.05),60);
+    for(let i=0;i<8;i++)parts.push({x:nx*CL+4,y:Y0+ny*CL+4,
+      vx:(Math.random()-.5)*1.8,vy:(Math.random()-.5)*1.8,l:16});
+  }
+  if(grow>0)grow--;else sn.pop();
+}
+
+// --- drawing ---
+function sprite(pat,x,y,col,hi){
+  X.fillStyle=P[col];
+  for(let r=0;r<pat.length;r++)for(let c=0;c<pat[r].length;c++)
+    if(pat[r][c]==='#')X.fillRect(x+c,y+r,1,1);
+  if(hi){X.fillStyle=P[hi];X.fillRect(x+1,y+1,1,1)}
+}
+function seg(cx,cy,col){
+  X.fillStyle=P[col];
+  X.fillRect(cx*CL+1,Y0+cy*CL+1,CL-2,CL-2);
+  X.fillStyle=P[15];
+  X.fillRect(cx*CL+2,Y0+cy*CL+2,1,1);
+}
+function frame(){
+  t++;
+  const spd=Math.max(4,9-Math.floor(sc/3));
+  if(S===1&&t%spd===0)step();
+  if(S===2&&auto&&t%60===0){S=1;reset()}
+
+  // bg + faint dots
+  X.fillStyle=P[1];X.fillRect(0,0,128,128);
+  X.fillStyle=P[2];
+  for(let y=0;y<8;y++)for(let x=0;x<8;x++)X.fillRect(x*16+7,y*16+7,1,1);
+  // playfield border
+  X.fillStyle=P[2];
+  X.fillRect(0,Y0-1,128,1);X.fillRect(0,127,128,1);
+  X.fillRect(0,Y0,1,128-Y0);X.fillRect(127,Y0,1,128-Y0);
+
+  if(S===0){
+    // title: slithering demo snake
+    for(let i=8;i>=0;i--){
+      const x=Math.floor(((t*.6+i*10)%150))-10;
+      const y=Math.round(70+Math.sin(t*.07+i*.7)*9);
+      X.fillStyle=P[i%2?14:8];
+      X.fillRect(x,y,7,7);
+      if(i===0){sprite(HR,x+1,y+1,14,7)}
+    }
+    txtC('LILI SNAKE',26,14);
+    txtC('EAT HEARTS. GROW.',40,6);
+    if(t%60<40)txtC('CLICK OR ARROW',92,7);
+    txtC('BEST '+bs,104,13);
+    txtC('< BY LILI >',116,2);
+  }else{
+    // food (golden heart, pulses)
+    const pu=Math.sin(t*.2)>.2?0:1;
+    sprite(FD_,fd[0]*CL+1,Y0+fd[1]*CL+2-pu,10,15);
+    if(t%40<8){X.fillStyle=P[7];X.fillRect(fd[0]*CL+7,Y0+fd[1]*CL+1,1,1)}
+    // snake body (candy stripe)
+    for(let i=sn.length-1;i>=1;i--)seg(sn[i][0],sn[i][1],i%4<2?14:8);
+    // head = heart facing travel dir
+    const h=sn[0];
+    sprite(HR,h[0]*CL+1,Y0+h[1]*CL+2,14,7);
+    X.fillStyle=P[1];
+    const ex=dir[0]===0?1:(dir[0]>0?3:1), ey=dir[1]===0?1:(dir[1]>0?2:1);
+    X.fillRect(h[0]*CL+ex+1,Y0+h[1]*CL+ey+1,1,1);
+    // particles
+    for(let i=parts.length-1;i>=0;i--){
+      const p=parts[i];p.x+=p.vx;p.y+=p.vy;p.l--;
+      if(p.l<=0){parts.splice(i,1);continue}
+      X.fillStyle=P[p.l%2?10:15];
+      X.fillRect(Math.round(p.x),Math.round(p.y),1,1);
+    }
+    // HUD
+    txt('SCORE '+sc,3,5,7);
+    txtR('BEST '+bs,5,13);
+    if(S===2){
+      X.fillStyle='rgba(0,0,0,.45)';X.fillRect(0,0,128,128);
+      txtC('GAME OVER',40,8);
+      txtC('SCORE '+sc,54,7);
+      txtC('BEST '+bs,62,10);
+      if(t%60<40)txtC('CLICK TO RETRY',76,14);
+    }
+  }
+  requestAnimationFrame(frame);
+}
+
+// --- input: keys + swipe + tap ---
+function q(d){
+  if(S===0){S=1;reset();beep(660,.06)}
+  if(S===2){S=1;reset();beep(660,.06);return}
+  if(d&&dq.length<2)dq.push(d);
+}
+addEventListener('keydown',e=>{
+  const m={ArrowUp:[0,-1],ArrowDown:[0,1],ArrowLeft:[-1,0],ArrowRight:[1,0],
+           KeyW:[0,-1],KeyS:[0,1],KeyA:[-1,0],KeyD:[1,0]}[e.code];
+  if(m){e.preventDefault();if(!auto)q(m)}
+  if(e.code==='Space'){e.preventDefault();if(!auto)q(null)}
+});
+let px=0,py=0;
+c.addEventListener('pointerdown',e=>{px=e.clientX;py=e.clientY;if(!auto&&S!==1)q(null)});
+c.addEventListener('pointerup',e=>{
+  if(auto)return;
+  const dx=e.clientX-px,dy=e.clientY-py;
+  if(Math.max(Math.abs(dx),Math.abs(dy))<18){if(S!==1)q(null);return}
+  q(Math.abs(dx)>Math.abs(dy)?[Math.sign(dx),0]:[0,Math.sign(dy)]);
+});
+if(auto){S=1;reset()}
+// --- rec mode: synchronous capture into DOM for GIF previews (?rec=N) ---
+if(location.search.includes('rec')){
+  const rf=frame,rn=+(new URLSearchParams(location.search).get('rec'))||90;
+  const d=document.createElement('textarea');d.id='REC';document.body.appendChild(d);
+  const cap=[],st=[];
+  for(let i=0;i<rn;i++){rf();cap.push(c.toDataURL('image/png'));st.push([S,sn[0]?sn[0][0]+':'+sn[0][1]:'-',sc,sn.length].join(','))}
+  d.textContent=cap.join('\n');
+  const d2=document.createElement('textarea');d2.id='REC2';d2.textContent=st.join(';');document.body.appendChild(d2);
+}else{frame()}
+</script>
+</body>
+</html>
