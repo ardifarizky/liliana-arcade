@@ -40,6 +40,10 @@ function txt(s,x,y,col){
 function txtC(s,y,col){txt(s,Math.round((128-String(s).length*4)/2),y,col)}
 function txtR(s,y,col){txt(s,125-String(s).length*4,y,col)}
 
+// --- difficulty: EASY/NORMAL toggle (feedback loop — "kesusahan?" fix knob) ---
+let easy=localStorage.getItem('snk_e')==='1'||location.search.includes('easy');
+function setEasy(v){easy=v;try{localStorage.setItem('snk_e',v?'1':'0')}catch(e){}}
+
 // --- audio: oscillators only, no files ---
 let ac;
 function beep(f,d,ty){
@@ -137,7 +141,7 @@ function seg(cx,cy,col){
 }
 function frame(){
   t++;
-  const spd=Math.max(4,9-Math.floor(sc/3));
+  const spd=Math.max(easy?7:4,(easy?12:9)-Math.floor(sc/(easy?6:3)));
   if(S===1&&t%spd===0)step();
   if(S===2&&auto&&t%60===0){S=1;reset()}
 
@@ -161,6 +165,8 @@ function frame(){
     }
     txtC('LILI SNAKE',26,14);
     txtC('EAT HEARTS. GROW.',40,6);
+    txtC('MODE '+(easy?'EASY':'NORMAL'),56,easy?11:9);
+    txtC('TAP MODE OR E',66,5);
     if(t%60<40)txtC('CLICK OR ARROW',92,7);
     txtC('BEST '+bs,104,13);
     txtC('< BY LILI >',116,2);
@@ -205,13 +211,23 @@ function q(d){
   if(d&&dq.length<2)dq.push(d);
 }
 addEventListener('keydown',e=>{
+  if(e.code==='KeyE'&&S===0){e.preventDefault();if(!auto){setEasy(!easy);beep(easy?520:880,.06)}return}
   const m={ArrowUp:[0,-1],ArrowDown:[0,1],ArrowLeft:[-1,0],ArrowRight:[1,0],
            KeyW:[0,-1],KeyS:[0,1],KeyA:[-1,0],KeyD:[1,0]}[e.code];
   if(m){e.preventDefault();if(!auto)q(m)}
   if(e.code==='Space'){e.preventDefault();if(!auto)q(null)}
 });
 let px=0,py=0;
-c.addEventListener('pointerdown',e=>{px=e.clientX;py=e.clientY;if(!auto&&S!==1)q(null)});
+c.addEventListener('pointerdown',e=>{
+  px=e.clientX;py=e.clientY;
+  if(auto)return;
+  // tap the MODE row on the title screen = toggle difficulty (mobile-friendly)
+  if(S===0){
+    const r=c.getBoundingClientRect(),cy=(e.clientY-r.top)/r.height*128;
+    if(cy>50&&cy<76){setEasy(!easy);beep(easy?520:880,.06);return}
+    q(null);
+  }else if(S!==1)q(null);
+});
 c.addEventListener('pointerup',e=>{
   if(auto)return;
   const dx=e.clientX-px,dy=e.clientY-py;

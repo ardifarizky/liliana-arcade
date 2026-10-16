@@ -42,6 +42,10 @@ function txt(s,x,y,col){
 }
 function txtC(s,y,col){txt(s,Math.round((128-String(s).length*4)/2),y,col)}
 
+// --- difficulty: EASY/NORMAL toggle (feedback loop — "kesusahan?" fix knob) ---
+let easy=localStorage.getItem('cav_e')==='1'||location.search.includes('easy');
+function setEasy(v){easy=v;try{localStorage.setItem('cav_e',v?'1':'0')}catch(e){}}
+
 // --- audio: 3 beeps, zero files ---
 let ac;
 function beep(f,d,ty){
@@ -56,16 +60,19 @@ function beep(f,d,ty){
 }
 
 // --- game state ---
-const PW=34,GAP=38,SPD=.7;
+const PW=34;
+let GAP=38,SPD=.7,GRV=.14,FLP=-2.15;
+function applyDiff(){if(easy){GAP=46;SPD=.55;GRV=.12;FLP=-1.95}else{GAP=38;SPD=.7;GRV=.14;FLP=-2.15}}
+applyDiff();
 let S=0,py=64,pv=0,pts=[],sc=0,bs=0,t=0,dead=0,auto=0;
 try{bs=+(localStorage.lilicave||0)}catch(e){}
 if(location.search.includes('auto'))auto=1;
 
 function reset(){py=64;pv=0;pts=[[96,20+Math.random()*50]];sc=0;dead=0;t=0}
-function flap(){pv=-2.15;beep(640,.06)}
+function flap(){pv=FLP;beep(640,.06)}
 
 function play(){
-  pv+=.14;py+=pv;
+  pv+=GRV;py+=pv;
   if(pts[0][0]<-6)pts.shift();
   if(pts[pts.length-1][0]<96)pts.push([pts[pts.length-1][0]+56,14+Math.random()*60]);
   for(const p of pts){
@@ -130,6 +137,8 @@ function frame(){
     // title
     txtC('LILI CAVE',30,14);
     heart(61,58+Math.round(Math.sin(t*.08)*3));
+    txtC('MODE '+(easy?'EASY':'NORMAL'),70,easy?11:9);
+    txtC('TAP MODE OR E',78,5);
     if(t%60<40)txtC('CLICK OR SPACE',82,7);
     txtC('BEST '+bs,94,13);
     txtC('< BY LILI >',110,2);
@@ -155,8 +164,12 @@ function inp(){
   else if(S===1&&!auto)flap();
   else if(S===2){S=1;reset();flap()}
 }
-c.addEventListener('pointerdown',inp);
-addEventListener('keydown',e=>{if(e.code==='Space'){e.preventDefault();inp()}});
+c.addEventListener('pointerdown',e=>{
+  if(!auto&&S===0){const r=c.getBoundingClientRect(),cy=(e.clientY-r.top)/r.height*128;
+    if(cy>64&&cy<88){setEasy(!easy);applyDiff();beep(easy?520:880,.06);return}}
+  inp();
+});
+addEventListener('keydown',e=>{if(e.code==='KeyE'&&S===0&&!auto){e.preventDefault();setEasy(!easy);applyDiff();beep(easy?520:880,.06);return}if(e.code==='Space'){e.preventDefault();inp()}});
 if(auto){S=1;reset()}
 // --- rec mode: synchronous capture into DOM for GIF previews (?rec=N) ---
 if(location.search.includes('rec')){
