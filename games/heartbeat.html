@@ -1,0 +1,263 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>HEARTBEAT</title>
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body { background: #1a0a1a; display: flex; justify-content: center; align-items: center; min-height: 100vh; font-family: monospace; }
+canvas { image-rendering: pixelated; border: 4px solid #ff69b4; }
+</style>
+</head>
+<body>
+<canvas id="c" width="256" height="256"></canvas>
+<script>
+const c = document.getElementById('c');
+const ctx = c.getContext('2d');
+const W = 128, H = 128;
+c.width = W; c.height = H;
+c.style.width = '256px'; c.style.height = '256px';
+
+// Audio context
+let audioCtx;
+function initAudio() { if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)(); }
+function beep(freq, dur = 0.1, vol = 0.3) {
+  if (!audioCtx) return;
+  const osc = audioCtx.createOscillator();
+  const gain = audioCtx.createGain();
+  osc.connect(gain); gain.connect(audioCtx.destination);
+  osc.frequency.value = freq;
+  osc.type = 'square';
+  gain.gain.setValueAtTime(vol, audioCtx.currentTime);
+  gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + dur);
+  osc.start(); osc.stop(audioCtx.currentTime + dur);
+}
+
+// Game state
+let hearts = [];
+let score = 0;
+let combo = 0;
+let maxCombo = 0;
+let miss = 0;
+let bpm = 120;
+let beatInterval = 60000 / bpm;
+let lastBeat = 0;
+let gameStarted = false;
+let gameOver = false;
+let hitZoneY = 100;
+let feedback = '';
+let feedbackTimer = 0;
+
+// Simple chip-tune melody
+const melody = [523, 587, 659, 698, 784, 698, 659, 587];
+let melodyIndex = 0;
+
+function spawnHeart() {
+  const x = 20 + Math.random() * (W - 40);
+  hearts.push({ x, y: -10, speed: 0.8 + Math.random() * 0.3 });
+}
+
+function drawHeart(x, y, size = 5, color = '#ff69b4') {
+  ctx.fillStyle = color;
+  // Pixel heart shape
+  const heart = [
+    [0,1,1,0,1,1,0],
+    [1,1,1,1,1,1,1],
+    [1,1,1,1,1,1,1],
+    [0,1,1,1,1,1,0],
+    [0,0,1,1,1,0,0],
+    [0,0,0,1,0,0,0]
+  ];
+  const scale = size / 7;
+  for (let row = 0; row < heart.length; row++) {
+    for (let col = 0; col < heart[row].length; col++) {
+      if (heart[row][col]) {
+        ctx.fillRect(x + col * scale, y + row * scale, scale, scale);
+      }
+    }
+  }
+}
+
+function drawText(text, x, y, color = '#fff', size = 8) {
+  ctx.fillStyle = color;
+  ctx.font = `${size}px monospace`;
+  ctx.textAlign = 'center';
+  ctx.fillText(text, x, y);
+}
+
+function update(time) {
+  ctx.fillStyle = '#1a0a1a';
+  ctx.fillRect(0, 0, W, H);
+
+  if (!gameStarted) {
+    // Title screen
+    drawHeart(W/2 - 15, 40, 30, '#ff1493');
+    drawText('HEARTBEAT', W/2, 90, '#ff69b4', 12);
+    drawText('Tap hearts on beat!', W/2, 105, '#fff', 8);
+    drawText('Click/Space to start', W/2, 120, '#aaa', 7);
+    return;
+  }
+
+  if (gameOver) {
+    drawText('GAME OVER', W/2, 40, '#ff69b4', 12);
+    drawText(`Score: ${score}`, W/2, 60, '#fff', 10);
+    drawText(`Max Combo: ${maxCombo}x`, W/2, 75, '#ffaa00', 9);
+    drawText('Click to restart', W/2, 95, '#aaa', 8);
+    return;
+  }
+
+  // Spawn hearts on beat
+  if (time - lastBeat > beatInterval) {
+    spawnHeart();
+    lastBeat = time;
+  }
+
+  // Draw hit zone
+  ctx.strokeStyle = '#ff69b480';
+  ctx.lineWidth = 1;
+  ctx.beginPath();
+  ctx.moveTo(0, hitZoneY);
+  ctx.lineTo(W, hitZoneY);
+  ctx.stroke();
+
+  // Update and draw hearts
+  for (let i = hearts.length - 1; i >= 0; i--) {
+    const h = hearts[i];
+    h.y += h.speed;
+
+    // Missed heart
+    if (h.y > H + 10) {
+      hearts.splice(i, 1);
+      combo = 0;
+      miss++;
+      feedback = 'MISS';
+      feedbackTimer = 30;
+      beep(150, 0.1, 0.2);
+      if (miss >= 5) {
+        gameOver = true;
+      }
+      continue;
+    }
+
+    // Draw heart
+    const inZone = Math.abs(h.y - hitZoneY) < 8;
+    drawHeart(h.x - 5, h.y - 5, inZone ? 12 : 10, inZone ? '#ffff00' : '#ff69b4');
+  }
+
+  // Draw feedback
+  if (feedbackTimer > 0) {
+    feedbackTimer--;
+    const alpha = feedbackTimer / 30;
+    ctx.globalAlpha = alpha;
+    drawText(feedback, W/2, hitZoneY - 15, feedback === 'PERFECT' ? '#ffff00' : feedback === 'GREAT' ? '#00ff00' : feedback === 'MISS' ? '#ff0000' : '#fff', 10);
+    ctx.globalAlpha = 1;
+  }
+
+  // Draw UI
+  drawText(`Score: ${score}`, W/2, 10, '#fff', 8);
+  if (combo > 1) {
+    drawText(`${combo}x COMBO`, W/2, 20, '#ffaa00', 7);
+  }
+  drawText(`♥ ${5 - miss}`, W - 15, 10, '#ff69b4', 7);
+}
+
+function hit() {
+  if (!gameStarted || gameOver) return;
+
+  let hit = false;
+  for (let i = 0; i < hearts.length; i++) {
+    const h = hearts[i];
+    const dist = Math.abs(h.y - hitZoneY);
+
+    if (dist < 12) {
+      hearts.splice(i, 1);
+      hit = true;
+
+      if (dist < 4) {
+        feedback = 'PERFECT';
+        score += 100 + combo * 10;
+        combo++;
+        beep(melody[melodyIndex % melody.length], 0.15, 0.4);
+        melodyIndex++;
+      } else if (dist < 8) {
+        feedback = 'GREAT';
+        score += 50 + combo * 5;
+        combo++;
+        beep(melody[melodyIndex % melody.length], 0.1, 0.3);
+        melodyIndex++;
+      } else {
+        feedback = 'OK';
+        score += 25;
+        combo = 0;
+        beep(400, 0.08, 0.2);
+      }
+
+      feedbackTimer = 30;
+      maxCombo = Math.max(maxCombo, combo);
+      break;
+    }
+  }
+
+  if (!hit) {
+    combo = 0;
+    feedback = 'MISS';
+    feedbackTimer = 30;
+    beep(150, 0.1, 0.2);
+  }
+}
+
+function loop(time) {
+  update(time);
+  requestAnimationFrame(loop);
+}
+
+// Input handlers
+c.addEventListener('click', () => {
+  initAudio();
+  if (!gameStarted) {
+    gameStarted = true;
+    lastBeat = performance.now();
+  } else if (gameOver) {
+    // Reset
+    hearts = [];
+    score = 0;
+    combo = 0;
+    maxCombo = 0;
+    miss = 0;
+    melodyIndex = 0;
+    gameOver = false;
+    gameStarted = true;
+    lastBeat = performance.now();
+  } else {
+    hit();
+  }
+});
+
+document.addEventListener('keydown', (e) => {
+  if (e.code === 'Space' || e.code === 'KeyD' || e.code === 'KeyF' || e.code === 'KeyJ' || e.code === 'KeyK') {
+    e.preventDefault();
+    initAudio();
+    if (!gameStarted) {
+      gameStarted = true;
+      lastBeat = performance.now();
+    } else if (gameOver) {
+      hearts = [];
+      score = 0;
+      combo = 0;
+      maxCombo = 0;
+      miss = 0;
+      melodyIndex = 0;
+      gameOver = false;
+      gameStarted = true;
+      lastBeat = performance.now();
+    } else {
+      hit();
+    }
+  }
+});
+
+requestAnimationFrame(loop);
+</script>
+</body>
+</html>
